@@ -2,127 +2,208 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Chat</title>
+    <title>Comms ChatGPT Fancy UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        body {
+          font-family: 'Inter', sans-serif;
+          background: #f0f2f5;
+          margin: 0;
+          height: 100vh;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
         #chat-container {
-          max-width: 700px;
-          margin: 50px auto;
-          background: #fff;
-          border-radius: 10px;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-          padding: 20px;
           display: flex;
           flex-direction: column;
-          height: 80vh;
-        }
-        #messages {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          overflow-y: auto;
-          flex: 1;
-          padding-right: 10px;
-        }
-        .message {
-          padding: 10px 15px;
+          width: 90%;
+          max-width: 800px;
+          height: 90vh;
+          background: #ffffff;
           border-radius: 20px;
-          max-width: 80%;
-          word-wrap: break-word;
+          box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+          overflow: hidden;
         }
-        .user { background-color: #007bff; color: #fff; align-self: flex-end; }
-        .server { background-color: #e4e6eb; color: #000; align-self: flex-start; }
-        #input-container { display: flex; margin-top: 15px; }
+
+        #chat {
+          flex: 1;
+          padding: 20px;
+          overflow-y: auto;
+          scroll-behavior: smooth;
+        }
+
+        .message {
+          max-width: 70%;
+          margin: 10px 0;
+          padding: 12px 18px;
+          border-radius: 18px;
+          line-height: 1.5;
+          word-wrap: break-word;
+          white-space: pre-wrap; /* preserves spacing and line breaks */
+        }
+
+        .user {
+          background: linear-gradient(135deg,#4f9cff,#0084ff);
+          color: white;
+          align-self: flex-end;
+          border-bottom-right-radius: 4px;
+        }
+
+        .bot {
+          background: linear-gradient(135deg,#e0e0e0,#f5f5f5);
+          color: #000;
+          align-self: flex-start;
+          border-bottom-left-radius: 4px;
+        }
+
+        #input-area {
+          display: flex;
+          padding: 12px;
+          background: #f7f7f7;
+          border-top: 1px solid #ddd;
+        }
+
         #input {
           flex: 1;
-          padding: 10px 15px;
+          padding: 12px 16px;
           border-radius: 20px;
           border: 1px solid #ccc;
           outline: none;
+          font-size: 16px;
         }
-        #send-btn {
-          padding: 10px 20px;
+
+        #send {
           margin-left: 10px;
-          border-radius: 20px;
+          padding: 12px 24px;
+          background: #0084ff;
+          color: #fff;
           border: none;
-          background-color: #007bff;
-          color: white;
+          border-radius: 20px;
           cursor: pointer;
+          font-size: 16px;
+          font-weight: 600;
+          transition: background 0.2s;
         }
-        #send-btn:hover { background-color: #0056b3; }
+
+        #send:hover {
+          background: #006fd6;
+        }
+
+        .typing-dots {
+          display: inline-block;
+          width: 4px;
+          height: 4px;
+          margin-right: 2px;
+          background: #555;
+          border-radius: 50%;
+          animation: blink 1s infinite;
+        }
+
+        .typing-dots:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes blink {
+          0%, 80%, 100% { opacity: 0; }
+          40% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
 
 <div id="chat-container">
-    <div id="messages"></div>
-    <div id="input-container">
-        <input id="input" placeholder="Type a message..." />
-        <button id="send-btn">Send</button>
+    <div id="chat"></div>
+    <div id="input-area">
+        <input type="text" id="input" placeholder="Type a message..." />
+        <button id="send">Send</button>
     </div>
 </div>
 
 <script>
-    const messagesContainer = document.getElementById("messages");
-    const input = document.getElementById("input");
-    const sendBtn = document.getElementById("send-btn");
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
 
-    const socket = new WebSocket("ws://localhost:8080/mcp-chat");
+    let ws = new WebSocket('ws://localhost:8080/mcp');
+    let msgId = 1;
 
-    // Track incomplete server message for chunk streaming
-    let currentServerMessage = null;
-
-    socket.onopen = () => {
-      appendMessage("Server: Connected to MCP Server", "server");
-      appendMessage("Server: ✅ Connected to MCP WebSocket", "server");
+    ws.onopen = () => {
+      addBotMessage('Connected to MCP server');
+      ws.send(JSON.stringify({jsonrpc:"2.0",id:msgId++,method:"initialize",params:{}}));
     };
 
-    socket.onmessage = (event) => {
-      const data = event.data;
-
-      try {
-        const json = JSON.parse(data);
-
-        if(json.response) {
-          if (!currentServerMessage) {
-            currentServerMessage = appendMessage("", "server");
-          }
-          currentServerMessage.textContent += json.response;
-        }
-
-        if(json.done) {
-          currentServerMessage = null;
-        }
-      } catch (e) {
-        appendMessage(`Server: ${data}`, "server");
+    ws.onmessage = (event) => {
+      let data = JSON.parse(event.data);
+      if(data.result && data.result.output){
+        streamBotMessage(data.result.output);
+      } else if(data.error){
+        addBotMessage("Error: " + data.error.message);
       }
     };
 
-    socket.onclose = () => appendMessage("Server: Disconnected", "server");
-    socket.onerror = (err) => appendMessage(`Server error: ${err}`, "server");
+    sendBtn.onclick = sendMessage;
+    input.addEventListener('keypress', e => { if(e.key==='Enter') sendMessage(); });
 
-    sendBtn.addEventListener("click", sendMessage);
-    input.addEventListener("keypress", (e) => {
-      if(e.key === "Enter") sendMessage();
-    });
-
-    function sendMessage() {
+    function sendMessage(){
       const text = input.value.trim();
       if(!text) return;
-
-      appendMessage(`You: ${text}`, "user");
-      socket.send(text);
-      input.value = "";
+      addUserMessage(text);
+      ws.send(JSON.stringify({
+        jsonrpc:"2.0",
+        id: msgId++,
+        method:"call_tool",
+        params:{
+          tool:"llm",
+          model:"mistral:7b-instruct-v0.3-q8_0",
+          input:text
+        }
+      }));
+      input.value = '';
     }
 
-    function appendMessage(text, type) {
-      const msg = document.createElement("div");
-      msg.className = `message ${type}`;
-      msg.textContent = text;
-      messagesContainer.appendChild(msg);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      return msg;
+    // User message
+    function addUserMessage(text){
+      const div = document.createElement('div');
+      div.className = 'message user';
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Bot message instantly
+    function addBotMessage(text){
+      const div = document.createElement('div');
+      div.className = 'message bot';
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Streaming bot message with proper spacing
+    function streamBotMessage(text){
+      const div = document.createElement('div');
+      div.className = 'message bot';
+      const span = document.createElement('span');
+      div.appendChild(span);
+
+      // typing indicator
+      const typing = document.createElement('span');
+      typing.className = 'typing-dots';
+      div.appendChild(typing);
+
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+
+      let i=0;
+      const interval = setInterval(()=>{
+        span.innerText += text[i++];
+        chat.scrollTop = chat.scrollHeight;
+        if(i>=text.length){
+          clearInterval(interval);
+          typing.remove(); // remove typing dots
+        }
+      }, 20); // 20ms per character
     }
 </script>
 
