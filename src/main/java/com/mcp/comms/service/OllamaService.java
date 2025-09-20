@@ -3,61 +3,57 @@ package com.mcp.comms.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @Service
 public class OllamaService {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaService.class);
+    private final WebClient webClient;
 
-    private static final String MODEL_NAME = "mistral:7b-instruct-v0.3-q8_0";
+    public OllamaService() {
+        log.info("🟢 Initializing OllamaService with WebClient");
+        this.webClient = WebClient.builder()
+                .baseUrl("http://localhost:11434")
+                .build();
+        log.info("✅ OllamaService initialized with baseUrl http://localhost:11434");
+    }
 
     /**
-     * Streams query to Ollama and invokes callback for each token.
+     * Streams query response from Ollama model
+     *
+     * @param prompt           the user prompt
+     * @param onTokenReceived  consumer callback for each token
      */
-    public void streamQuery(String prompt, Consumer<String> onToken) throws IOException {
-        log.info("🚀 Starting Ollama process with model: {} and prompt: {}", MODEL_NAME, prompt);
+    public void streamQuery(String prompt, Consumer<String> onTokenReceived) {
+        log.info("➡️ [OllamaService] Sending prompt to Ollama: {}", prompt);
 
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                "ollama", "run", MODEL_NAME
-        );
-        processBuilder.redirectErrorStream(true);
+        Flux<String> responseFlux = webClient.post()
+                .uri("/api/generate")
+                .bodyValue(Map.of(
+                        "model", "mistral:7b-instruct-v0.3-q8_0", // you can change to your model
+                        "prompt", prompt,
+                        "stream", true
+                ))
+                .retrieve()
+                .bodyToFlux(String.class)
+                .doOnSubscribe(sub -> log.info("📡 [OllamaService] Subscribed to Ollama stream..."))
+                .doOnNext(chunk -> log.info("⬅️ [OllamaService] Received raw chunk: {}", chunk))
+                .doOnError(err -> log.error("❌ [OllamaService] Error from Ollama", err))
+                .doOnComplete(() -> log.info("✅ [OllamaService] Completed streaming from Ollama"));
 
-        Process process = processBuilder.start();
-
-        // Write the user prompt into Ollama stdin
-        try {
-            log.debug("✍️ Sending prompt to Ollama stdin...");
-            process.getOutputStream().write((prompt + "\n").getBytes());
-            process.getOutputStream().flush();
-            process.getOutputStream().close();
-        } catch (IOException e) {
-            log.error("❌ Failed to write prompt to Ollama stdin", e);
-            throw e;
-        }
-
-        // Capture Ollama output line by line
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                log.debug("📥 Ollama raw output: {}", line);
-                onToken.accept(line);
+        // IMPORTANT: must subscribe, otherwise nothing happens!
+        responseFlux.subscribe(token -> {
+            log.info("📝 [OllamaService] Processed token: {}", token);
+            try {
+                onTokenReceived.accept(token);
+            } catch (Exception e) {
+                log.error("⚠️ [OllamaService] Error delivering token to callback", e);
             }
-        } catch (IOException e) {
-            log.error("❌ Error reading Ollama output", e);
-            throw e;
-        }
-
-        try {
-            int exitCode = process.waitFor();
-            log.info("✅ Ollama process finished with exit code: {}", exitCode);
-        } catch (InterruptedException e) {
-            log.error("⚠️ Ollama process interrupted", e);
-            Thread.currentThread().interrupt();
-        }
+        });
     }
 }

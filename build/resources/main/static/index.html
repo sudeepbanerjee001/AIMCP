@@ -2,94 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCP Chat</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 40px auto;
+        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        #chat-container {
+          max-width: 700px;
+          margin: 50px auto;
+          background: #fff;
+          border-radius: 10px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          height: 80vh;
         }
-        #chat {
-            border: 1px solid #ccc;
-            padding: 10px;
-            height: 400px;
-            overflow-y: auto;
-            background: #f9f9f9;
+        #messages {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          overflow-y: auto;
+          flex: 1;
+          padding-right: 10px;
         }
-        .user { color: blue; margin: 5px 0; }
-        .mistral { color: green; margin: 5px 0; }
-        #status { margin-bottom: 10px; }
-        #inputBox { width: 80%; padding: 10px; }
-        #sendBtn { padding: 10px; }
+        .message {
+          padding: 10px 15px;
+          border-radius: 20px;
+          max-width: 80%;
+          word-wrap: break-word;
+        }
+        .user { background-color: #007bff; color: #fff; align-self: flex-end; }
+        .server { background-color: #e4e6eb; color: #000; align-self: flex-start; }
+        #input-container { display: flex; margin-top: 15px; }
+        #input {
+          flex: 1;
+          padding: 10px 15px;
+          border-radius: 20px;
+          border: 1px solid #ccc;
+          outline: none;
+        }
+        #send-btn {
+          padding: 10px 20px;
+          margin-left: 10px;
+          border-radius: 20px;
+          border: none;
+          background-color: #007bff;
+          color: white;
+          cursor: pointer;
+        }
+        #send-btn:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
-<h2>MCP Chat</h2>
-<div id="status">Status: <span id="connStatus">Disconnected ❌</span></div>
-<div id="chat"></div>
-<input type="text" id="inputBox" placeholder="Type your message">
-<button id="sendBtn">Send</button>
+<div id="chat-container">
+    <div id="messages"></div>
+    <div id="input-container">
+        <input id="input" placeholder="Type a message..." />
+        <button id="send-btn">Send</button>
+    </div>
+</div>
 
 <script>
-    const chat = document.getElementById('chat');
-    const connStatus = document.getElementById('connStatus');
-    const inputBox = document.getElementById('inputBox');
-    const sendBtn = document.getElementById('sendBtn');
+    const messagesContainer = document.getElementById("messages");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send-btn");
 
-    // Connect WebSocket
-    const ws = new WebSocket(`ws://${window.location.host}/mcp`);
+    const socket = new WebSocket("ws://localhost:8080/mcp-chat");
 
-    ws.onopen = () => {
-        connStatus.textContent = "Connected ✅";
+    // Track incomplete server message for chunk streaming
+    let currentServerMessage = null;
+
+    socket.onopen = () => {
+      appendMessage("Server: Connected to MCP Server", "server");
+      appendMessage("Server: ✅ Connected to MCP WebSocket", "server");
     };
 
-    ws.onclose = () => {
-        connStatus.textContent = "Disconnected ❌";
-    };
+    socket.onmessage = (event) => {
+      const data = event.data;
 
-    ws.onmessage = (event) => {
-        const lastMsg = document.querySelector('.mistral:last-child');
-        if (lastMsg && lastMsg.dataset.streaming === "true") {
-            // Append token to the last message
-            lastMsg.textContent += event.data;
-        } else {
-            // New message from Mistral
-            const div = document.createElement('div');
-            div.className = 'mistral';
-            div.dataset.streaming = "true"; // mark as streaming
-            div.textContent = event.data;
-            chat.appendChild(div);
+      try {
+        const json = JSON.parse(data);
+
+        if(json.response) {
+          if (!currentServerMessage) {
+            currentServerMessage = appendMessage("", "server");
+          }
+          currentServerMessage.textContent += json.response;
         }
-        chat.scrollTop = chat.scrollHeight;
+
+        if(json.done) {
+          currentServerMessage = null;
+        }
+      } catch (e) {
+        appendMessage(`Server: ${data}`, "server");
+      }
     };
+
+    socket.onclose = () => appendMessage("Server: Disconnected", "server");
+    socket.onerror = (err) => appendMessage(`Server error: ${err}`, "server");
+
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keypress", (e) => {
+      if(e.key === "Enter") sendMessage();
+    });
 
     function sendMessage() {
-        const msg = inputBox.value.trim();
-        if (!msg) return;
-        // Add user message
-        const div = document.createElement('div');
-        div.className = 'user';
-        div.textContent = "You: " + msg;
-        chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight;
+      const text = input.value.trim();
+      if(!text) return;
 
-        // Send to server
-        ws.send(msg);
-        inputBox.value = '';
-
-        // Prepare Mistral response placeholder
-        const mDiv = document.createElement('div');
-        mDiv.className = 'mistral';
-        mDiv.dataset.streaming = "true";
-        mDiv.textContent = "";
-        chat.appendChild(mDiv);
+      appendMessage(`You: ${text}`, "user");
+      socket.send(text);
+      input.value = "";
     }
 
-    sendBtn.addEventListener('click', sendMessage);
-    inputBox.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
+    function appendMessage(text, type) {
+      const msg = document.createElement("div");
+      msg.className = `message ${type}`;
+      msg.textContent = text;
+      messagesContainer.appendChild(msg);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      return msg;
+    }
 </script>
 
 </body>
