@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.0'
+    id 'application' // Apply the application plugin
+}
+
+group = 'com.mcp'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+application {
+    mainClass = 'com.mcp.comms.MCPCommsApplication'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.postgresql:postgresql'
+    implementation 'io.jsonwebtoken:jjwt:0.9.1'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.json:json:20240303'
+    implementation 'com.squareup.okhttp3:okhttp-sse:4.12.0'
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

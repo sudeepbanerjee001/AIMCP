@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MCP Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+        }
+        #chat {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+        .user { color: blue; margin: 5px 0; }
+        .mistral { color: green; margin: 5px 0; }
+        #status { margin-bottom: 10px; }
+        #inputBox { width: 80%; padding: 10px; }
+        #sendBtn { padding: 10px; }
+    </style>
+</head>
+<body>
+
+<h2>MCP Chat</h2>
+<div id="status">Status: <span id="connStatus">Disconnected ❌</span></div>
+<div id="chat"></div>
+<input type="text" id="inputBox" placeholder="Type your message">
+<button id="sendBtn">Send</button>
+
+<script>
+    const chat = document.getElementById('chat');
+    const connStatus = document.getElementById('connStatus');
+    const inputBox = document.getElementById('inputBox');
+    const sendBtn = document.getElementById('sendBtn');
+
+    // Connect WebSocket
+    const ws = new WebSocket(`ws://${window.location.host}/mcp`);
+
+    ws.onopen = () => {
+        connStatus.textContent = "Connected ✅";
+    };
+
+    ws.onclose = () => {
+        connStatus.textContent = "Disconnected ❌";
+    };
+
+    ws.onmessage = (event) => {
+        const lastMsg = document.querySelector('.mistral:last-child');
+        if (lastMsg && lastMsg.dataset.streaming === "true") {
+            // Append token to the last message
+            lastMsg.textContent += event.data;
+        } else {
+            // New message from Mistral
+            const div = document.createElement('div');
+            div.className = 'mistral';
+            div.dataset.streaming = "true"; // mark as streaming
+            div.textContent = event.data;
+            chat.appendChild(div);
+        }
+        chat.scrollTop = chat.scrollHeight;
+    };
+
+    function sendMessage() {
+        const msg = inputBox.value.trim();
+        if (!msg) return;
+        // Add user message
+        const div = document.createElement('div');
+        div.className = 'user';
+        div.textContent = "You: " + msg;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+
+        // Send to server
+        ws.send(msg);
+        inputBox.value = '';
+
+        // Prepare Mistral response placeholder
+        const mDiv = document.createElement('div');
+        mDiv.className = 'mistral';
+        mDiv.dataset.streaming = "true";
+        mDiv.textContent = "";
+        chat.appendChild(mDiv);
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputBox.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+</body>
+</html>
