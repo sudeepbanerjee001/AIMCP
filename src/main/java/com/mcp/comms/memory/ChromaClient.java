@@ -1,58 +1,63 @@
 package com.mcp.comms.memory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
 public class ChromaClient {
+
     private final String baseUrl;
     private final RestTemplate restTemplate;
-    private final ObjectMapper mapper;
 
     public ChromaClient(String baseUrl) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = baseUrl; // e.g., "http://127.0.0.1:8000/api/v2"
         this.restTemplate = new RestTemplate();
-        this.mapper = new ObjectMapper();
     }
 
-    public void addDocument(String collection, String id, String text, List<Float> embedding, Map<String, String> metadata) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("ids", Collections.singletonList(id));
-        payload.put("documents", Collections.singletonList(text));
-        payload.put("embeddings", Collections.singletonList(embedding));
-        payload.put("metadatas", Collections.singletonList(metadata));
+    public void createCollection(String name) {
+        String url = baseUrl + "/collections";
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, defaultHeaders());
+        restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+    }
+
+    public void addDocument(String collection, String id, String document, List<Float> embedding, Map<String, String> metadata) {
+        // Convert Float -> Double
+        List<Double> embeddingD = new ArrayList<>();
+        for (Float f : embedding) {
+            embeddingD.add(f.doubleValue());
+        }
 
         String url = baseUrl + "/collections/" + collection + "/add";
-        restTemplate.postForEntity(url, payload, String.class);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("ids", Collections.singletonList(id));
+        body.put("documents", Collections.singletonList(document));
+        body.put("embeddings", Collections.singletonList(embeddingD));
+        body.put("metadatas", Collections.singletonList(metadata != null ? metadata : new HashMap<>()));
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, defaultHeaders());
+        restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
     }
 
-    /**
-     * Queries Chroma collection and returns the matched documents (strings).
-     */
-    public List<String> query(String collection, List<Float> queryEmbedding, int topK) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("query_embeddings", Collections.singletonList(queryEmbedding));
-        payload.put("n_results", topK);
-
+    public String queryCollection(String collection, List<Double> queryEmbedding, int nResults) {
         String url = baseUrl + "/collections/" + collection + "/query";
 
-        ResponseEntity<String> response = restTemplate.postForEntity(url, payload, String.class);
+        Map<String, Object> body = new HashMap<>();
+        body.put("query_embeddings", Collections.singletonList(queryEmbedding));
+        body.put("n_results", nResults);
 
-        try {
-            JsonNode root = mapper.readTree(response.getBody());
-            JsonNode docs = root.path("documents").path(0);
-            List<String> results = new ArrayList<>();
-            if (docs.isArray()) {
-                for (JsonNode d : docs) {
-                    results.add(d.asText());
-                }
-            }
-            return results;
-        } catch (Exception e) {
-            throw new RuntimeException("Chroma query parse error", e);
-        }
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, defaultHeaders());
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        return response.getBody();
+    }
+
+    private HttpHeaders defaultHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 }

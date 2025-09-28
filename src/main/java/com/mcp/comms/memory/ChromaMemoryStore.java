@@ -1,29 +1,48 @@
 package com.mcp.comms.memory;
 
-import com.mcp.comms.embedding.EmbeddingService;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class ChromaMemoryStore {
+
     private final ChromaClient client;
-    private final EmbeddingService embeddingService;
-    private final String collectionName;
+    private final String collectionName = "aimcp";
 
-    public ChromaMemoryStore(ChromaClient client,
-                             EmbeddingService embeddingService,
-                             String collectionName) {
+    public ChromaMemoryStore(ChromaClient client) {
         this.client = client;
-        this.embeddingService = embeddingService;
-        this.collectionName = collectionName;
     }
 
+    /**
+     * Add memory to Chroma
+     */
     public void addMemory(String text, Map<String, String> metadata) {
-        List<Float> vector = embeddingService.getEmbedding(text);
-        client.addDocument(collectionName, UUID.randomUUID().toString(), text, vector, metadata);
+        String id = UUID.randomUUID().toString();
+        List<Float> embedding = new ArrayList<>();
+        // Dummy embedding — replace with real embedding logic
+        embedding.add(0.1f); embedding.add(0.2f); embedding.add(0.3f);
+
+        client.addDocument(collectionName, id, text, embedding, metadata);
     }
 
-    public List<String> querySimilar(String text, int topK) {
-        List<Float> queryVec = embeddingService.getEmbedding(text);
-        return client.query(collectionName, queryVec, topK);
+    /**
+     * Query top K documents using embedding
+     */
+    public String queryMemory(List<Float> queryVec, int topK) {
+        List<Double> queryVecD = new ArrayList<>();
+        for (Float f : queryVec) queryVecD.add(f.doubleValue());
+        return client.queryCollection(collectionName, queryVecD, topK);
+    }
+
+    /**
+     * Query top K documents using text input
+     */
+    public String querySimilar(String textQuery, int topK) {
+        // Convert text to dummy embedding (replace with real embedding)
+        List<Float> embedding = new ArrayList<>();
+        embedding.add(0.1f); embedding.add(0.2f); embedding.add(0.3f);
+
+        return queryMemory(embedding, topK);
     }
 }
