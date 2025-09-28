@@ -1,14 +1,11 @@
 package com.mcp.comms.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-<<<<<<< HEAD
 import com.mcp.comms.embedding.DummyEmbeddingService;
 import com.mcp.comms.llm.ContextManager;
 import com.mcp.comms.llm.ModelWrapper;
 import com.mcp.comms.llm.PromptBuilder;
 import com.mcp.comms.memory.*;
-=======
->>>>>>> origin/master
 import com.mcp.comms.model.JsonRpcRequest;
 import com.mcp.comms.model.JsonRpcResponse;
 import com.mcp.comms.service.MCPResourceService;
@@ -29,7 +26,6 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
     private final LlmManager llmManager;
     private final ObjectMapper mapper = new ObjectMapper();
 
-<<<<<<< HEAD
     EmbeddingService emb = new DummyEmbeddingService();
     ChromaClient chroma = new ChromaClient("http://localhost:8000");
     ChromaMemoryStore store = new ChromaMemoryStore(chroma, emb, "aimcp");
@@ -42,9 +38,6 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
     String reply = ctxManager.handleMessage(sessionId, userMessage);
 
-
-=======
->>>>>>> origin/master
     @Autowired
     public MCPWebSocketHandler(MCPResourceService resourceService, LlmManager llmManager) {
         this.resourceService = resourceService;
