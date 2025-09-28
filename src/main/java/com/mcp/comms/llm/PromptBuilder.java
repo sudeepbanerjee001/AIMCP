@@ -7,8 +7,11 @@ public class PromptBuilder {
                         List<String> memories,
                         List<String> recentHistory,
                         String newMessage) {
-        String memText = String.join("\n", memories);
-        String historyText = String.join("\n", recentHistory);
+        String memText = (memories == null || memories.isEmpty()) ? "No relevant memory." :
+                String.join("\n", memories);
+
+        String historyText = (recentHistory == null || recentHistory.isEmpty()) ? "No recent history." :
+                String.join("\n", recentHistory);
 
         return systemPrompt + "\n\n" +
                 "Relevant Memory:\n" + memText + "\n\n" +

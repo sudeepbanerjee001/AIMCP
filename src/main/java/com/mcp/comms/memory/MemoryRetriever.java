@@ -10,6 +10,7 @@ public class MemoryRetriever {
     }
 
     public List<String> retrieveRelevantMemories(String query) {
+        // topK=3 default — tune as needed
         return memoryStore.querySimilar(query, 3);
     }
 }

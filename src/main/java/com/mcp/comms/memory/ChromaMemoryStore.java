@@ -1,5 +1,7 @@
 package com.mcp.comms.memory;
 
+import com.mcp.comms.embedding.EmbeddingService;
+
 import java.util.*;
 
 public class ChromaMemoryStore {

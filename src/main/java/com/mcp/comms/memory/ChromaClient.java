@@ -18,8 +18,7 @@ public class ChromaClient {
         this.mapper = new ObjectMapper();
     }
 
-    public void addDocument(String collection, String id, String text,
-                            List<Float> embedding, Map<String, String> metadata) {
+    public void addDocument(String collection, String id, String text, List<Float> embedding, Map<String, String> metadata) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("ids", Collections.singletonList(id));
         payload.put("documents", Collections.singletonList(text));
@@ -30,6 +29,9 @@ public class ChromaClient {
         restTemplate.postForEntity(url, payload, String.class);
     }
 
+    /**
+     * Queries Chroma collection and returns the matched documents (strings).
+     */
     public List<String> query(String collection, List<Float> queryEmbedding, int topK) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("query_embeddings", Collections.singletonList(queryEmbedding));
@@ -41,10 +43,12 @@ public class ChromaClient {
 
         try {
             JsonNode root = mapper.readTree(response.getBody());
-            JsonNode docs = root.get("documents").get(0);
+            JsonNode docs = root.path("documents").path(0);
             List<String> results = new ArrayList<>();
-            for (JsonNode d : docs) {
-                results.add(d.asText());
+            if (docs.isArray()) {
+                for (JsonNode d : docs) {
+                    results.add(d.asText());
+                }
             }
             return results;
         } catch (Exception e) {
