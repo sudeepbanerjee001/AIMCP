@@ -13,10 +13,11 @@ public class MemoryStore {
         this.embeddingService = embeddingService;
     }
 
-    public void addMemory(String text, Map<String, String> metadata) {
-        List<Float> vector = embeddingService.getEmbedding(text);
-        MemoryEntry entry = new MemoryEntry(UUID.randomUUID().toString(), text, metadata, vector);
+    public String addMemory(String message, String id, List<Double> embedding, Map<String,String> metadata){
+    List<Float> vector = embeddingService.getEmbedding(message);
+        MemoryEntry entry = new MemoryEntry(UUID.randomUUID().toString(), message, metadata, vector);
         entries.add(entry);
+        return message;
     }
 
     public List<MemoryEntry> querySimilar(String query, int topK) {

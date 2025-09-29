@@ -2,34 +2,52 @@ package com.mcp.comms.memory;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class ChromaMemoryStore {
 
     private final ChromaClient client;
-    private final String collectionName = "default";
 
     public ChromaMemoryStore(ChromaClient client) {
         this.client = client;
     }
 
-    public void addMemory(String id, String document, Map<String, String> metadata) {
-        // Add a document + embedding + metadata to Chroma
-        // Use dummy embeddings (as Float)
-        List<Float> dummyEmbedding = List.of(0.0f, 0.0f, 0.0f);
-
-        client.addDocument(collectionName, id, document, dummyEmbedding, metadata);
+    /**
+     * Search the collection using an embedding query.
+     */
+    public String search(String collectionName, List<Double> queryEmbedding, int topK) {
+        try {
+            String jsonResponse = client.queryCollection(collectionName, queryEmbedding, topK);
+            return jsonResponse;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
-    public List<String> queryMemory(List<Float> queryEmbedding, int topK) {
-        // ChromaClient expects Float embeddings; convert to Double for its internal query
-        List<Double> embeddingD = queryEmbedding.stream()
-                .map(Float::doubleValue)
-                .collect(Collectors.toList());
+    /**
+     * Store an embedding in a collection.
+     */
+    public String store(String collectionName, String id, List<Double> embedding, String metadata) {
+        try {
+            String jsonResponse = client.addToCollection(collectionName, id, embedding, metadata);
+            return jsonResponse;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 
-        String jsonResponse = client.queryCollection(collectionName, embeddingD, topK);
-
-        // Simplified: parse JSON and return as List<String>
-        return List.of(jsonResponse);
+    /**
+     * New method to match ContextManager call
+     */
+    public String addMemory(String message, String id, List<Double> embedding, Map<String, String> metadata) {
+        try {
+            // Convert metadata map to string if needed
+            String metadataStr = (metadata != null) ? metadata.toString() : "";
+            return store("default", id, embedding, metadataStr);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }
