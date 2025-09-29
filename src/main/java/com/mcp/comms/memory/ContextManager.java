@@ -1,9 +1,12 @@
 package com.mcp.comms.memory;
 
+import org.springframework.stereotype.Component;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+@Component
 public class ContextManager {
 
     private final ChromaMemoryStore memoryStore;
@@ -58,7 +61,7 @@ public class ContextManager {
      * @param topK           Number of results to return.
      * @return JSON response from memory store.
      */
-    public String searchMemory(List<Double> queryEmbedding, int topK) {
+    public String searchMemory(List<Float> queryEmbedding, int topK) {
         return memoryStore.search("default", queryEmbedding, topK);
     }
 
@@ -69,7 +72,7 @@ public class ContextManager {
      * @param topK           Number of results to return.
      * @return JSON response from memory store.
      */
-    public String getSimilarDocuments(List<Double> queryEmbedding, int topK) {
+    public String getSimilarDocuments(List<Float> queryEmbedding, int topK) {
         return searchMemory(queryEmbedding, topK);
     }
 }

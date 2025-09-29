@@ -1,15 +1,23 @@
 package com.mcp.comms.memory;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
+
+@Component
 public class ChromaClient {
 
     private final String baseUrl;
 
-    public ChromaClient(String baseUrl) {
+
+    public ChromaClient(@Value("${chroma.base-url}") String baseUrl) {
         this.baseUrl = baseUrl;
     }
 
@@ -22,6 +30,8 @@ public class ChromaClient {
      * @param metadata       Metadata associated with the document.
      * @return Response from Chroma server.
      */
+
+
     public String addToCollection(String collectionName, String id, List<Double> embedding, String metadata) {
         try {
             // Build the URL
@@ -56,7 +66,7 @@ public class ChromaClient {
      * @param topK           Number of results to return.
      * @return Response from Chroma server.
      */
-    public String queryCollection(String collectionName, List<Double> queryEmbedding, int topK) {
+    public String queryCollection(String collectionName, List<Float> queryEmbedding, int topK) {
         try {
             String url = baseUrl + "/collections/" + collectionName + "/query";
 

@@ -1,8 +1,12 @@
 package com.mcp.comms.memory;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.Map;
 
+
+@Component
 public class ChromaMemoryStore {
 
     private final ChromaClient client;
@@ -14,7 +18,7 @@ public class ChromaMemoryStore {
     /**
      * Search the collection using an embedding query.
      */
-    public String search(String collectionName, List<Double> queryEmbedding, int topK) {
+    public String search(String collectionName, List<Float> queryEmbedding, int topK) {
         try {
             String jsonResponse = client.queryCollection(collectionName, queryEmbedding, topK);
             return jsonResponse;
@@ -49,5 +53,10 @@ public class ChromaMemoryStore {
             e.printStackTrace();
             return null;
         }
+    }
+
+    public List<String> queryMemory(List<Float> queryEmbedding, int topK) {
+
+        return null;
     }
 }

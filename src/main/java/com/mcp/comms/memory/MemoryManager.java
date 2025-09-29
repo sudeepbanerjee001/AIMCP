@@ -3,6 +3,7 @@ package com.mcp.comms.memory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,6 @@ public class MemoryManager {
     }
 
     public List<String> retrieveMemory(List<Float> queryEmbedding, int topK) {
-        return contextManager.getSimilarDocuments(queryEmbedding, topK);
+        return Collections.singletonList(contextManager.getSimilarDocuments(queryEmbedding, topK));
     }
 }
