@@ -1,28 +1,27 @@
 package com.mcp.comms.memory;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 public class ContextManager {
 
-    private final ChromaClient chromaClient;
-    private final String collectionName = "aimcp";
+    private final ChromaMemoryStore memoryStore;
 
-    public ContextManager(ChromaClient client) {
-        this.chromaClient = client;
-        chromaClient.createCollection(collectionName);
+    public ContextManager(ChromaMemoryStore memoryStore) {
+        this.memoryStore = memoryStore;
     }
 
-    public void addToMemory(String sessionId, String message, List<Double> embedding) {
-        String docId = sessionId + "_" + System.currentTimeMillis();
-
-        List<Float> embeddingF = new ArrayList<>();
-        for (Double d : embedding) embeddingF.add(d.floatValue());
-
-        Map<String, String> metadata = new HashMap<>();
-        chromaClient.addDocument(collectionName, docId, message, embeddingF, metadata);
+    // Process a message and return a string response
+    public String processMessage(String message) {
+        List<Float> dummyEmbedding = List.of(0.0f, 0.0f, 0.0f);
+        List<String> similarDocs = memoryStore.queryMemory(dummyEmbedding, 3);
+        return String.join("\n", similarDocs);
     }
 
-    public String getContext(String sessionId, List<Double> queryEmbedding, int nResults) {
-        return chromaClient.queryCollection(collectionName, queryEmbedding, nResults);
+    // Store a message into Chroma memory
+    public void storeMessage(String message, Map<String, String> metadata) {
+        String id = "msg-" + System.currentTimeMillis();
+        List<Float> dummyEmbedding = List.of(0.0f, 0.0f, 0.0f); // Replace with real embedding if available
+        memoryStore.addMemory(id, message, metadata, dummyEmbedding);
     }
 }

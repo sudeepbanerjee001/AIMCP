@@ -1,31 +1,23 @@
 package com.mcp.comms.memory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class MemoryManager {
 
-    private final ChromaMemoryStore memoryStore;
+    private final ContextManager contextManager;
 
-    public MemoryManager(ChromaMemoryStore store) {
-        this.memoryStore = store;
+    public MemoryManager(ContextManager contextManager) {
+        this.contextManager = contextManager;
     }
 
-    /**
-     * Add summary or message to memory
-     */
-    public void saveMemory(String summary, String sessionId) {
+    public void saveSummary(String summary) {
         Map<String, String> metadata = new HashMap<>();
-        metadata.put("sessionId", sessionId);
-
-        memoryStore.addMemory(summary, metadata);
+        // Add metadata if needed
+        contextManager.storeMessage(summary, metadata);
     }
 
-    /**
-     * Retrieve relevant memories
-     */
-    public String retrieveMemory(List<Float> queryEmbedding, int topK) {
-        return memoryStore.queryMemory(queryEmbedding, topK);
+    public String retrieveSimilar(String message) {
+        return contextManager.processMessage(message);
     }
 }

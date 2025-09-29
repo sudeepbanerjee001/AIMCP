@@ -1,48 +1,35 @@
 package com.mcp.comms.memory;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class ChromaMemoryStore {
 
     private final ChromaClient client;
-    private final String collectionName = "aimcp";
+    private final String collectionName = "default";
 
     public ChromaMemoryStore(ChromaClient client) {
         this.client = client;
     }
 
-    /**
-     * Add memory to Chroma
-     */
-    public void addMemory(String text, Map<String, String> metadata) {
-        String id = UUID.randomUUID().toString();
-        List<Float> embedding = new ArrayList<>();
-        // Dummy embedding — replace with real embedding logic
-        embedding.add(0.1f); embedding.add(0.2f); embedding.add(0.3f);
+    public void addMemory(String id, String document, Map<String, String> metadata) {
+        // Add a document + embedding + metadata to Chroma
+        // Use dummy embeddings (as Float)
+        List<Float> dummyEmbedding = List.of(0.0f, 0.0f, 0.0f);
 
-        client.addDocument(collectionName, id, text, embedding, metadata);
+        client.addDocument(collectionName, id, document, dummyEmbedding, metadata);
     }
 
-    /**
-     * Query top K documents using embedding
-     */
-    public String queryMemory(List<Float> queryVec, int topK) {
-        List<Double> queryVecD = new ArrayList<>();
-        for (Float f : queryVec) queryVecD.add(f.doubleValue());
-        return client.queryCollection(collectionName, queryVecD, topK);
-    }
+    public List<String> queryMemory(List<Float> queryEmbedding, int topK) {
+        // ChromaClient expects Float embeddings; convert to Double for its internal query
+        List<Double> embeddingD = queryEmbedding.stream()
+                .map(Float::doubleValue)
+                .collect(Collectors.toList());
 
-    /**
-     * Query top K documents using text input
-     */
-    public String querySimilar(String textQuery, int topK) {
-        // Convert text to dummy embedding (replace with real embedding)
-        List<Float> embedding = new ArrayList<>();
-        embedding.add(0.1f); embedding.add(0.2f); embedding.add(0.3f);
+        String jsonResponse = client.queryCollection(collectionName, embeddingD, topK);
 
-        return queryMemory(embedding, topK);
+        // Simplified: parse JSON and return as List<String>
+        return List.of(jsonResponse);
     }
 }
