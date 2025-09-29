@@ -13,7 +13,7 @@ public class ContextManager {
     }
 
     /**
-     * Adds a message and its embedding to the memory store.
+     * Core method: Adds a message and its embedding to the memory store.
      *
      * @param message  The text message to store.
      * @param metadata Optional metadata associated with this message.
@@ -41,9 +41,20 @@ public class ContextManager {
     }
 
     /**
-     * Retrieves top K similar messages for a given query embedding.
+     * Processes an incoming message (used by WebSocket handler).
      *
-     * @param queryEmbedding The query embedding vector.
+     * @param message Input message from client.
+     * @return Confirmation response string.
+     */
+    public String processMessage(String message) {
+        addMessageToMemory(message, Map.of("source", "websocket"));
+        return "Message processed: " + message;
+    }
+
+    /**
+     * Main search method: retrieves top K similar messages for a given query embedding.
+     *
+     * @param queryEmbedding The query embedding vector (List<Double>).
      * @param topK           Number of results to return.
      * @return JSON response from memory store.
      */
@@ -52,17 +63,13 @@ public class ContextManager {
     }
 
     /**
-     * Processes an incoming message (used by WebSocket handler).
-     * Stores the message in memory and returns a confirmation response.
+     * Alias for searchMemory, for backward compatibility.
      *
-     * @param message Input message from client.
-     * @return Confirmation response string.
+     * @param queryEmbedding The query embedding vector.
+     * @param topK           Number of results to return.
+     * @return JSON response from memory store.
      */
-    public String processMessage(String message) {
-        // Store message in memory with simple metadata
-        addMessageToMemory(message, Map.of("source", "websocket"));
-
-        // Return a response for the WebSocket client
-        return "Message processed: " + message;
+    public String getSimilarDocuments(List<Double> queryEmbedding, int topK) {
+        return searchMemory(queryEmbedding, topK);
     }
 }
