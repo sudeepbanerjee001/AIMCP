@@ -1,29 +1,21 @@
 package com.mcp.comms.memory;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Component
 public class MemoryManager {
 
-    private final ContextManager contextManager;
+    private static final Logger logger = LoggerFactory.getLogger(MemoryManager.class);
 
-    @Autowired
-    public MemoryManager(ContextManager contextManager) {
-        this.contextManager = contextManager;
+    public void storeUserMessage(String message) {
+        logger.info("Storing user message: {}", message);
+        // TODO: Save in Chroma/DB with metadata
     }
 
-   /* public void addMemory(String summary) {
-        Map<String, String> metadata = new HashMap<>();
-        contextManager.storeMessage(summary, metadata);
+    public void storeAiMessage(String message) {
+        logger.info("Storing AI response: {}", message);
+        // TODO: Save in Chroma/DB with metadata
     }
-
-    public List<String> retrieveMemory(List<Float> queryEmbedding, int topK) {
-        return Collections.singletonList(contextManager.getSimilarDocuments(queryEmbedding, topK));
-    }*/
 }

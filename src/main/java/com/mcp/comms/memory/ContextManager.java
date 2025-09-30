@@ -1,62 +1,35 @@
 package com.mcp.comms.memory;
 
+import org.springframework.stereotype.Component;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.function.Consumer;
+import java.util.Map;
 
+/**
+ * ContextManager handles storage and retrieval of messages in memory.
+ */
+@Component
 public class ContextManager {
 
     private final ChromaMemoryStore memoryStore;
-    private final OllamaClient ollamaClient;
-    private final ExecutorService executor;
 
-    public ContextManager(ChromaMemoryStore memoryStore, OllamaClient ollamaClient) {
+    public ContextManager(ChromaMemoryStore memoryStore) {
         this.memoryStore = memoryStore;
-        this.ollamaClient = ollamaClient;
-        this.executor = Executors.newFixedThreadPool(4);
     }
 
     /**
-     * Asynchronously process a message
-     *
-     * @param message  User message
-     * @param callback Consumer<String> callback to receive streaming response
+     * Store a message with metadata.
+     * Called by MemoryManager.
      */
-    public void processMessageAsync(String message, Consumer<String> callback) {
-        executor.submit(() -> processMessage(message, callback));
+    public void storeMessage(String summary, Map<String, String> metadata) {
+        System.out.println("ContextManager storing message: " + summary + " with metadata: " + metadata);
+        // Delegate to memoryStore
+        memoryStore.saveMessage(summary, metadata);
     }
 
     /**
-     * Process message: generate embedding, store in memory, retrieve similar messages, call LLM
+     * Retrieve messages
      */
-    private void processMessage(String message, Consumer<String> callback) {
-        System.out.println("Processing message: " + message);
-
-        // 1. Generate embedding
-        List<Double> embedding = EmbeddingGenerator.generateEmbedding(message);
-        System.out.println("Embedding generated: size=" + embedding.size());
-
-        // 2. Store in memory
-        String messageId = "msg_" + UUID.randomUUID();
-        memoryStore.storeMessage(messageId, message, embedding);
-
-        // 3. Retrieve similar messages
-        List<String> similarMessages = memoryStore.getSimilarMessages(embedding, 5);
-        System.out.println("Found " + similarMessages.size() + " similar messages");
-
-        // 4. Construct prompt
-        StringBuilder prompt = new StringBuilder("You are MCP AI assistant.\n\n");
-        if (!similarMessages.isEmpty()) {
-            prompt.append("Here are similar previous messages for context:\n");
-            for (String msg : similarMessages) {
-                prompt.append("- ").append(msg).append("\n");
-            }
-        }
-        prompt.append("\nUser: ").append(message).append("\nAssistant:");
-
-        // 5. Call Ollama LLM with streaming
-        ollamaClient.generateStream(prompt.toString(), callback);
+    public List<String> getMessages(int topK) {
+        return memoryStore.getTopMessages(topK);
     }
 }

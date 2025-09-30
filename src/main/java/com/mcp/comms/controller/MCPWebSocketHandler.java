@@ -1,42 +1,53 @@
 package com.mcp.comms.controller;
 
-import com.mcp.comms.memory.ContextManager;
+import com.mcp.comms.memory.MemoryManager;
+import com.mcp.comms.service.MyAiService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import org.springframework.stereotype.Component;
 
 @Component
 public class MCPWebSocketHandler extends TextWebSocketHandler {
 
-    private final ContextManager contextManager;
+    private static final Logger logger = LoggerFactory.getLogger(MCPWebSocketHandler.class);
 
-    public MCPWebSocketHandler(ContextManager contextManager) {
-        this.contextManager = contextManager;
+    private final MyAiService myAiService;
+    private final MemoryManager memoryManager;
+
+    public MCPWebSocketHandler(MyAiService myAiService, MemoryManager memoryManager) {
+        this.myAiService = myAiService;
+        this.memoryManager = memoryManager;
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        System.out.println("New WebSocket session established: " + session.getId());
-    }
+    public void handleTextMessage(WebSocketSession session, TextMessage message) {
+        try {
+            String input = message.getPayload();
+            logger.info("Received from client: {}", input);
 
-    @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        String userMessage = message.getPayload();
-        System.out.println("Received WebSocket message: " + userMessage);
+            // Step 1: Store message in memory
+            memoryManager.storeUserMessage(input);
 
-        // Echo the user message back to the UI (optional)
-        session.sendMessage(new TextMessage("You: " + userMessage));
+            // Step 2: Get AI-generated response
+            String aiResponse = myAiService.process(input);
 
-        // Process the message asynchronously and stream the response
-        contextManager.processMessageAsync(userMessage, token -> {
+            // Step 3: Store AI response in memory
+            memoryManager.storeAiMessage(aiResponse);
+
+            // Step 4: Send back to client
+            String response = "AI says: " + aiResponse;
+            session.sendMessage(new TextMessage(response));
+
+        } catch (Exception e) {
+            logger.error("Error in WebSocket message handling", e);
             try {
-                if (session.isOpen()) {
-                    session.sendMessage(new TextMessage(token));
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+                session.sendMessage(new TextMessage("Error: " + e.getMessage()));
+            } catch (Exception ex) {
+                logger.error("Failed to send error message to client", ex);
             }
-        });
+        }
     }
 }
