@@ -1,78 +1,62 @@
 package com.mcp.comms.memory;
 
-import org.springframework.stereotype.Component;
-
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
-@Component
 public class ContextManager {
 
     private final ChromaMemoryStore memoryStore;
+    private final OllamaClient ollamaClient;
+    private final ExecutorService executor;
 
-    public ContextManager(ChromaMemoryStore memoryStore) {
+    public ContextManager(ChromaMemoryStore memoryStore, OllamaClient ollamaClient) {
         this.memoryStore = memoryStore;
+        this.ollamaClient = ollamaClient;
+        this.executor = Executors.newFixedThreadPool(4);
     }
 
     /**
-     * Core method: Adds a message and its embedding to the memory store.
+     * Asynchronously process a message
      *
-     * @param message  The text message to store.
-     * @param metadata Optional metadata associated with this message.
+     * @param message  User message
+     * @param callback Consumer<String> callback to receive streaming response
      */
-    public void addMessageToMemory(String message, Map<String, String> metadata) {
-
-        // Example dummy embedding (replace with real embedding from your model)
-        List<Double> dummyEmbedding = Arrays.asList(0.1d, 0.2d, 0.3d);
-
-        // Unique ID for this memory entry
-        String memoryId = "doc_" + System.currentTimeMillis();
-
-        // Store in memoryStore
-        memoryStore.addMemory(message, memoryId, dummyEmbedding, metadata);
+    public void processMessageAsync(String message, Consumer<String> callback) {
+        executor.submit(() -> processMessage(message, callback));
     }
 
     /**
-     * Alias for addMessageToMemory, for backward compatibility.
-     *
-     * @param message  The text message to store.
-     * @param metadata Metadata associated with this message.
+     * Process message: generate embedding, store in memory, retrieve similar messages, call LLM
      */
-    public void storeMessage(String message, Map<String, String> metadata) {
-        addMessageToMemory(message, metadata);
-    }
+    private void processMessage(String message, Consumer<String> callback) {
+        System.out.println("Processing message: " + message);
 
-    /**
-     * Processes an incoming message (used by WebSocket handler).
-     *
-     * @param message Input message from client.
-     * @return Confirmation response string.
-     */
-    public String processMessage(String message) {
-        addMessageToMemory(message, Map.of("source", "websocket"));
-        return "Message processed: " + message;
-    }
+        // 1. Generate embedding
+        List<Double> embedding = EmbeddingGenerator.generateEmbedding(message);
+        System.out.println("Embedding generated: size=" + embedding.size());
 
-    /**
-     * Main search method: retrieves top K similar messages for a given query embedding.
-     *
-     * @param queryEmbedding The query embedding vector (List<Double>).
-     * @param topK           Number of results to return.
-     * @return JSON response from memory store.
-     */
-    public String searchMemory(List<Float> queryEmbedding, int topK) {
-        return memoryStore.search("default", queryEmbedding, topK);
-    }
+        // 2. Store in memory
+        String messageId = "msg_" + UUID.randomUUID();
+        memoryStore.storeMessage(messageId, message, embedding);
 
-    /**
-     * Alias for searchMemory, for backward compatibility.
-     *
-     * @param queryEmbedding The query embedding vector.
-     * @param topK           Number of results to return.
-     * @return JSON response from memory store.
-     */
-    public String getSimilarDocuments(List<Float> queryEmbedding, int topK) {
-        return searchMemory(queryEmbedding, topK);
+        // 3. Retrieve similar messages
+        List<String> similarMessages = memoryStore.getSimilarMessages(embedding, 5);
+        System.out.println("Found " + similarMessages.size() + " similar messages");
+
+        // 4. Construct prompt
+        StringBuilder prompt = new StringBuilder("You are MCP AI assistant.\n\n");
+        if (!similarMessages.isEmpty()) {
+            prompt.append("Here are similar previous messages for context:\n");
+            for (String msg : similarMessages) {
+                prompt.append("- ").append(msg).append("\n");
+            }
+        }
+        prompt.append("\nUser: ").append(message).append("\nAssistant:");
+
+        // 5. Call Ollama LLM with streaming
+        ollamaClient.generateStream(prompt.toString(), callback);
     }
 }

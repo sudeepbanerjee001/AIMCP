@@ -18,12 +18,12 @@ public class MemoryManager {
         this.contextManager = contextManager;
     }
 
-    public void addMemory(String summary) {
+   /* public void addMemory(String summary) {
         Map<String, String> metadata = new HashMap<>();
         contextManager.storeMessage(summary, metadata);
     }
 
     public List<String> retrieveMemory(List<Float> queryEmbedding, int topK) {
         return Collections.singletonList(contextManager.getSimilarDocuments(queryEmbedding, topK));
-    }
+    }*/
 }

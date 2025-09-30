@@ -1,11 +1,7 @@
 package com.mcp.comms.config;
 
 import com.mcp.comms.controller.MCPWebSocketHandler;
-import com.mcp.comms.memory.ContextManager;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -14,21 +10,16 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    private final ContextManager contextManager;
+    private final MCPWebSocketHandler mcpWebSocketHandler;
 
-    // Mark ContextManager as lazy
-    public WebSocketConfig(@Lazy ContextManager contextManager) {
-        this.contextManager = contextManager;
-    }
-
-    @Bean
-    @Lazy
-    public WebSocketHandler mcpWebSocketHandler() {
-        return new MCPWebSocketHandler(contextManager);
+    public WebSocketConfig(MCPWebSocketHandler mcpWebSocketHandler) {
+        this.mcpWebSocketHandler = mcpWebSocketHandler;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(mcpWebSocketHandler(), "/mcp").setAllowedOrigins("*");
+        // The client connects to ws://localhost:8080/mcp
+        registry.addHandler(mcpWebSocketHandler, "/mcp")
+                .setAllowedOrigins("*");
     }
 }
