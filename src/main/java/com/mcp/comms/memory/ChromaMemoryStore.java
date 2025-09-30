@@ -1,83 +1,65 @@
 package com.mcp.comms.memory;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.messaging.Message;
+import org.springframework.stereotype.Component;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
 
+/**
+ * ChromaMemoryStore handles low-level memory storage and retrieval.
+ */
+@Component
 public class ChromaMemoryStore {
 
-    // Internal memory store: message ID -> MessageData
-    private final Map<String, MessageData> memory = new ConcurrentHashMap<>();
+    // Simulated in-memory store
+    private final List<StoredMessage> store = new ArrayList<>();
 
-    // Class to hold message and embedding
-    private static class MessageData {
-        String message;
-        List<Double> embedding;
-
-        MessageData(String message, List<Double> embedding) {
-            this.message = message;
-            this.embedding = embedding;
-        }
+    // Convert List<Float> embeddings to List<Double> for querying
+    public List<Message> getSimilarMessages(List<Float> embedding, int topK) {
+        List<Double> queryEmbedding = embedding.stream()
+                .map(Float::doubleValue)
+                .collect(Collectors.toList());
+        // Replace with actual similarity search logic
+        System.out.println("Querying similar messages with embedding: " + queryEmbedding);
+        return List.of(); // Placeholder
     }
 
     /**
-     * Store a message along with its embedding in memory
-     *
-     * @param id        Unique message ID
-     * @param message   The message text
-     * @param embedding The embedding vector
+     * Save a message with metadata
      */
-    public void storeMessage(String id, String message, List<Double> embedding) {
-        memory.put(id, new MessageData(message, embedding));
-        System.out.println("Memory stored: id=" + id + ", message=" + message);
+    public void saveMessage(String summary, Map<String, String> metadata) {
+        store.add(new StoredMessage(summary, metadata));
+        System.out.println("ChromaMemoryStore saved message: " + summary);
     }
 
     /**
-     * Retrieve up to topK messages most similar to the given embedding
-     *
-     * @param queryEmbedding The embedding vector to compare against
-     * @param topK           Maximum number of similar messages to retrieve
-     * @return List of messages sorted by similarity
+     * Return top K messages (for demo)
      */
-    public List<String> getSimilarMessages(List<Double> queryEmbedding, int topK) {
-        // PriorityQueue to sort by similarity (highest first)
-        PriorityQueue<Map.Entry<String, MessageData>> pq = new PriorityQueue<>(
-                Comparator.comparingDouble(e -> -cosineSimilarity(queryEmbedding, e.getValue().embedding))
-        );
-
-        pq.addAll(memory.entrySet());
-
-        List<String> results = new ArrayList<>();
-        int count = 0;
-        while (!pq.isEmpty() && count < topK) {
-            Map.Entry<String, MessageData> entry = pq.poll();
-            results.add(entry.getValue().message);
-            count++;
-        }
-
-        return results;
+    public List<String> getTopMessages(int topK) {
+        return store.stream()
+                .limit(topK)
+                .map(StoredMessage::getSummary)
+                .toList();
     }
 
-    /**
-     * Compute cosine similarity between two vectors
-     *
-     * @param vec1 First vector
-     * @param vec2 Second vector
-     * @return Cosine similarity
-     */
-    private double cosineSimilarity(List<Double> vec1, List<Double> vec2) {
-        if (vec1.size() != vec2.size()) return 0.0;
+    // Inner class to hold message + metadata
+    private static class StoredMessage {
+        private final String summary;
+        private final Map<String, String> metadata;
 
-        double dot = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-
-        for (int i = 0; i < vec1.size(); i++) {
-            dot += vec1.get(i) * vec2.get(i);
-            normA += vec1.get(i) * vec1.get(i);
-            normB += vec2.get(i) * vec2.get(i);
+        public StoredMessage(String summary, Map<String, String> metadata) {
+            this.summary = summary;
+            this.metadata = metadata;
         }
 
-        if (normA == 0.0 || normB == 0.0) return 0.0;
-        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        public String getSummary() {
+            return summary;
+        }
+
+        public Map<String, String> getMetadata() {
+            return metadata;
+        }
     }
 }

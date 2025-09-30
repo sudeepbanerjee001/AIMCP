@@ -1,15 +1,14 @@
 package com.mcp.comms.memory;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
-
 import java.util.List;
 
+/**
+ * MemoryRetriever fetches similar messages using ChromaMemoryStore.
+ */
 @Component
 public class MemoryRetriever {
-
-    private static final Logger logger = LoggerFactory.getLogger(MemoryRetriever.class);
 
     private final ChromaMemoryStore memoryStore;
 
@@ -17,9 +16,11 @@ public class MemoryRetriever {
         this.memoryStore = memoryStore;
     }
 
-    // Retrieve similar messages using embeddings
-    public List<String> retrieveSimilarMessages(List<Double> embedding, int topK) {
-        logger.info("Retrieving up to {} similar messages", topK);
-        return memoryStore.getSimilarMessages(embedding, topK);
+    public List<Message> retrieveSimilarMessages(List<Double> embedding, int topK) {
+        // Convert embedding to List<Float> if needed
+        List<Float> floatEmbedding = embedding.stream()
+                .map(Double::floatValue)
+                .toList();
+        return memoryStore.getSimilarMessages(floatEmbedding, topK);
     }
 }

@@ -2,75 +2,108 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MCP Chat</title>
+    <title>MCP WebSocket Client</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f9f9f9; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100vh; margin: 0; }
-        #chat { width: 60%; max-width: 800px; height: 80%; border: 1px solid #ccc; background: #fff; padding: 10px; overflow-y: auto; margin-top: 20px; border-radius: 10px; }
-        .bubble { padding: 10px 15px; margin: 5px 0; border-radius: 15px; max-width: 70%; }
-        .user { background: #007bff; color: white; align-self: flex-end; }
-        .assistant { background: #e5e5ea; color: black; align-self: flex-start; }
-        .timestamp { font-size: 10px; opacity: 0.6; margin-top: 2px; }
-        input { width: 60%; max-width: 800px; padding: 10px; font-size: 14px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
-        .memory {
-            font-size: 12px;
-            color: #555;
-            margin-top: 5px;
-            padding: 5px;
-            border-left: 3px solid #aaa;
-            background: #f1f1f1;
-            border-radius: 5px;
+        body {
+          font-family: Arial, sans-serif;
+          background: #f9f9f9;
+          margin: 20px;
         }
-
+        h2 { color: #333; }
+        #status {
+          margin-bottom: 10px;
+          font-weight: bold;
+        }
+        #chat {
+          width: 100%;
+          height: 300px;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          padding: 10px;
+          background: #fff;
+          resize: none;
+          overflow-y: scroll;
+        }
+        #controls {
+          margin-top: 10px;
+        }
+        #messageInput {
+          width: 80%;
+          padding: 8px;
+          border-radius: 6px;
+          border: 1px solid #aaa;
+        }
+        #sendBtn {
+          padding: 8px 16px;
+          margin-left: 8px;
+          border: none;
+          border-radius: 6px;
+          background: #4caf50;
+          color: white;
+          cursor: pointer;
+        }
+        #sendBtn:hover {
+          background: #45a049;
+        }
     </style>
 </head>
 <body>
-<h2>MCP Chat</h2>
-<div id="chat">Connecting to MCP server...</div>
-<input type="text" id="input" placeholder="Type your message and press Enter">
+
+<h2>MCP WebSocket Client</h2>
+<div id="status">🔴 Not connected</div>
+
+<textarea id="chat" readonly></textarea>
+
+<div id="controls">
+    <input type="text" id="messageInput" placeholder="Type your message..." />
+    <button id="sendBtn" onclick="sendMessage()">Send</button>
+</div>
 
 <script>
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("input");
+    let socket;
 
-    const socket = new WebSocket("ws://localhost:8080/mcp");
+    function connect() {
+      socket = new WebSocket("ws://localhost:8080/mcp");
 
-    socket.onopen = () => {
-        chat.innerHTML = "<div class='assistant bubble'>✅ Connected to MCP server</div>";
-    };
+      socket.onopen = () => {
+        document.getElementById("status").innerText = "✅ Connected to MCP Server";
+        appendChat("System", "Connected to server.");
+      };
 
-  socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    const div = document.createElement("div");
-    div.className = (data.type === "user" ? "user" : "assistant") + " bubble";
+      socket.onmessage = (event) => {
+        appendChat("Server", event.data);
+      };
 
-    // Split memory section
-    const parts = data.message.split("📚 Similar messages from memory:");
-    if (parts.length > 1) {
-        div.innerHTML = parts[0]; // main response
-        const memoryDiv = document.createElement("div");
-        memoryDiv.className = "memory";
-        memoryDiv.innerText = "📚 Similar messages from memory:" + parts[1];
-        div.appendChild(memoryDiv);
-    } else {
-        div.innerHTML = data.message;
+      socket.onclose = () => {
+        document.getElementById("status").innerText = "🔴 Disconnected";
+        appendChat("System", "Disconnected from server.");
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        appendChat("System", "WebSocket error, check console.");
+      };
     }
 
-    // timestamp
-    const timestampDiv = document.createElement("div");
-    timestampDiv.className = "timestamp";
-    timestampDiv.innerText = data.time;
-    div.appendChild(timestampDiv);
+    function sendMessage() {
+      const input = document.getElementById("messageInput");
+      const msg = input.value.trim();
+      if (msg && socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(msg);
+        appendChat("You", msg);
+        input.value = "";
+      }
+    }
 
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-};
+    function appendChat(sender, message) {
+      const chat = document.getElementById("chat");
+      chat.value += sender + ": " + message + "\n";
+      chat.scrollTop = chat.scrollHeight;
+    }
 
-    input.addEventListener("keypress", (event) => {
-        if (event.key === "Enter" && input.value.trim() !== "") {
-            socket.send(input.value);
-            input.value = "";
-        }
-    });
+    // auto-connect when page loads
+    window.onload = connect;
 </script>
+
 </body>
 </html>
