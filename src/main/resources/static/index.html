@@ -2,108 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MCP WebSocket Client</title>
-    <style>
-        body {
-          font-family: Arial, sans-serif;
-          background: #f9f9f9;
-          margin: 20px;
-        }
-        h2 { color: #333; }
-        #status {
-          margin-bottom: 10px;
-          font-weight: bold;
-        }
-        #chat {
-          width: 100%;
-          height: 300px;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          padding: 10px;
-          background: #fff;
-          resize: none;
-          overflow-y: scroll;
-        }
-        #controls {
-          margin-top: 10px;
-        }
-        #messageInput {
-          width: 80%;
-          padding: 8px;
-          border-radius: 6px;
-          border: 1px solid #aaa;
-        }
-        #sendBtn {
-          padding: 8px 16px;
-          margin-left: 8px;
-          border: none;
-          border-radius: 6px;
-          background: #4caf50;
-          color: white;
-          cursor: pointer;
-        }
-        #sendBtn:hover {
-          background: #45a049;
-        }
-    </style>
+    <title>MCP Based AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2>Sessions</h2>
+        <ul id="session-list"></ul>
+        <button id="new-session">+ New Chat</button>
+    </aside>
 
-<h2>MCP WebSocket Client</h2>
-<div id="status">🔴 Not connected</div>
-
-<textarea id="chat" readonly></textarea>
-
-<div id="controls">
-    <input type="text" id="messageInput" placeholder="Type your message..." />
-    <button id="sendBtn" onclick="sendMessage()">Send</button>
+    <!-- Main chat window -->
+    <main class="chat-container">
+        <header class="chat-header">🤖 Comms AI Assistant</header>
+        <div id="messages" class="messages"></div>
+        <div class="input-area">
+            <input id="messageInput" type="text" placeholder="Type your message..." />
+            <button id="sendButton">Send</button>
+        </div>
+    </main>
 </div>
 
-<script>
-    let socket;
-
-    function connect() {
-      socket = new WebSocket("ws://localhost:8080/mcp");
-
-      socket.onopen = () => {
-        document.getElementById("status").innerText = "✅ Connected to MCP Server";
-        appendChat("System", "Connected to server.");
-      };
-
-      socket.onmessage = (event) => {
-        appendChat("Server", event.data);
-      };
-
-      socket.onclose = () => {
-        document.getElementById("status").innerText = "🔴 Disconnected";
-        appendChat("System", "Disconnected from server.");
-      };
-
-      socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        appendChat("System", "WebSocket error, check console.");
-      };
-    }
-
-    function sendMessage() {
-      const input = document.getElementById("messageInput");
-      const msg = input.value.trim();
-      if (msg && socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(msg);
-        appendChat("You", msg);
-        input.value = "";
-      }
-    }
-
-    function appendChat(sender, message) {
-      const chat = document.getElementById("chat");
-      chat.value += sender + ": " + message + "\n";
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    // auto-connect when page loads
-    window.onload = connect;
-</script>
-
+<script src="app.js"></script>
 </body>
 </html>
