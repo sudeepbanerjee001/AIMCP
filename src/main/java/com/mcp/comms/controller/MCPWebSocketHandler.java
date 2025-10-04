@@ -38,8 +38,9 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
             memoryManager.storeAiMessage(aiResponse);
 
             // Step 4: Send back to client
-            String response = "AI says: " + aiResponse;
-            session.sendMessage(new TextMessage(response));
+            //String response = "AI says: " + aiResponse;
+            //session.sendMessage(new TextMessage(response));
+            session.sendMessage(new TextMessage(aiResponse));
 
         } catch (Exception e) {
             logger.error("Error in WebSocket message handling", e);
