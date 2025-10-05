@@ -1,18 +1,17 @@
 package com.mcp.comms.controller;
 
-import org.springframework.stereotype.Component;
-import org.springframework.web.socket.*;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import com.mcp.comms.memory.MemoryManager;
 import com.mcp.comms.service.IntentDetectionService;
-import com.mcp.comms.service.ToolRegistryService;
 import com.mcp.comms.service.ToolInvokerService;
+import com.mcp.comms.service.ToolRegistryService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class MCPWebSocketHandler extends TextWebSocketHandler {
@@ -41,85 +40,101 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String userMessage = message.getPayload();
-        System.out.println("\n[MCP FLOW] 💬 Received from client: " + userMessage);
+        System.out.println("\n[MCP FLOW] ? Received from client: " + userMessage);
 
-        // Store user message
+        // 1️⃣ Store user message
         memoryManager.storeUserMessage(userMessage);
+        System.out.println("[MCP FLOW] ? Stored user message into MemoryManager");
 
-        // Step 1: Detect intent
-        String intent = intentDetectionService.detectIntent(userMessage);
-        System.out.println("[MCP FLOW] 🎯 Intent detected: " + intent);
+        // 2️⃣ Detect intent
+        String detectedIntent = intentDetectionService.detectIntent(userMessage);
+        System.out.println("[MCP FLOW] ? Intent detected: " + detectedIntent);
 
-        // Step 2: Find the appropriate tool
-        var toolInfo = toolRegistryService.getToolForIntent(intent);
+        // 3️⃣ Identify the tool for the intent
+        Map<String, Object> toolInfo = toolRegistryService.findToolByIntent(detectedIntent);
         if (toolInfo == null) {
-            System.out.println("[MCP FLOW] ⚠️ No matching tool found for intent: " + intent);
-            session.sendMessage(new TextMessage("Sorry, I couldn’t find a suitable tool for that request."));
+            session.sendMessage(new TextMessage("Sorry, I couldn't find a suitable tool for that request."));
             return;
         }
 
-        // Step 3: Prepare payload dynamically
+        System.out.println("[MCP FLOW] ? Selected tool -> name: " + toolInfo.get("toolName"));
+
+        // 4️⃣ Extract city dynamically from user message
+        String city = extractCityFromMessage(userMessage);
+        System.out.println("[MCP FLOW] ?? Extracted city: " + city);
+
+        // 5️⃣ Prepare payload
         Map<String, Object> payload = new HashMap<>();
-        payload.put("action", intent);
         payload.put("userMessage", userMessage);
+        payload.put("city", city);
+        payload.put("action", detectedIntent);
         payload.put("sessionId", session.getId());
         payload.put("timestamp", System.currentTimeMillis());
 
-        // Step 4: Dynamically extract city name from user message
-        String city = extractCityName(userMessage);
-        if (city != null) {
-            payload.put("city", city);
-            System.out.println("[MCP FLOW] 🏙️ Extracted city: " + city);
-        } else {
-            System.out.println("[MCP FLOW] ⚠️ No city found in user message. Sending request without city.");
+        System.out.println("[MCP FLOW] ? Payload prepared for tool: " + payload);
+
+        // 6️⃣ Invoke tool
+        Map<String, Object> toolResponseMap = toolInvokerService.invokeTool(
+                (String) toolInfo.get("toolName"),
+                (String) toolInfo.get("endpoint"),
+                payload
+        );
+
+        // 7️⃣ Convert numeric string values to proper types if Weather Forecast Tool
+        if ("Weather Forecast Tool".equals(toolInfo.get("toolName"))) {
+            toolResponseMap = parseNumericValues(toolResponseMap);
         }
 
-        // Step 5: Invoke tool
-        String response = toolInvokerService.invokeTool(toolInfo, payload);
-        System.out.println("[MCP FLOW] 📦 Tool response: " + response);
+        // 8️⃣ Store AI response
+        memoryManager.storeAiMessage(toolResponseMap.toString());
+        System.out.println("[MCP FLOW] ? Stored tool response into MemoryManager");
 
-        // Step 6: Store AI response
-        memoryManager.storeAiMessage(response);
-
-        // Step 7: Send response back to client
-        session.sendMessage(new TextMessage(response));
+        // 9️⃣ Send back to client
+        session.sendMessage(new TextMessage(toolResponseMap.toString()));
+        System.out.println("[MCP FLOW] ? Sent tool response back to client (session=" + session.getId() + ")");
     }
 
-    /**
-     * Extracts a city name dynamically from a user message.
-     * Uses regex-based named entity matching for locations.
-     */
-    private String extractCityName(String message) {
-        // Basic cleanup
-        String cleaned = message.trim();
-
-        // Simple regex to capture a potential city name after "in", "at", "from", or "for"
-        Pattern pattern = Pattern.compile("\\b(?:in|at|from|for)\\s+([A-Z][a-zA-Z]+(?:\\s+[A-Z][a-zA-Z]+)*)");
-        Matcher matcher = pattern.matcher(cleaned);
-
-        if (matcher.find()) {
-            return matcher.group(1).trim();
-        }
-
-        // If no city pattern detected, try to use a list of common city indicators dynamically
-        // e.g. "weather for New York City", "forecast Delhi"
-        Pattern fallback = Pattern.compile("(?i)(?:weather|forecast|temperature)\\s+(?:in\\s+)?([A-Z][a-zA-Z]+(?:\\s+[A-Z][a-zA-Z]+)*)");
-        Matcher fallbackMatcher = fallback.matcher(cleaned);
-
-        if (fallbackMatcher.find()) {
-            return fallbackMatcher.group(1).trim();
-        }
-
-        return null;
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) {
+        System.out.println("[MCP FLOW] 🔒 WebSocket connection closed. Session ID: " + session.getId());
     }
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
-        System.err.println("[MCP FLOW] ❌ WebSocket error: " + exception.getMessage());
+        System.err.println("[MCP FLOW] ❌ WebSocket transport error: " + exception.getMessage());
     }
 
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        System.out.println("[MCP FLOW] 🔒 WebSocket closed. Session ID: " + session.getId());
+    // Helper method to extract city from user message
+    private String extractCityFromMessage(String message) {
+        // Simple regex-based approach
+        // Looks for "at <City>" or "in <City>" patterns
+        String city = "Unknown";
+        String lowerMsg = message.toLowerCase();
+        if (lowerMsg.contains(" at ")) {
+            city = message.substring(lowerMsg.indexOf(" at ") + 4).split("[,?]")[0].trim();
+        } else if (lowerMsg.contains(" in ")) {
+            city = message.substring(lowerMsg.indexOf(" in ") + 4).split("[,?]")[0].trim();
+        }
+        return city;
+    }
+
+    // Helper method to parse numeric string values to Double
+    private Map<String, Object> parseNumericValues(Map<String, Object> response) {
+        Map<String, Object> parsed = new HashMap<>();
+        for (String key : response.keySet()) {
+            Object value = response.get(key);
+            if (value instanceof String) {
+                String strVal = (String) value;
+                try {
+                    Double num = Double.parseDouble(strVal);
+                    parsed.put(key, num);
+                } catch (NumberFormatException e) {
+                    parsed.put(key, strVal); // keep as string if not numeric
+                }
+            } else {
+                parsed.put(key, value);
+            }
+        }
+        return parsed;
     }
 }
