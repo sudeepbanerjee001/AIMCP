@@ -24,6 +24,21 @@ function initWebSocket() {
 
 // ---------------- Message Formatting ----------------
 function formatText(text) {
+  // Try to parse JSON for AI responses
+  try {
+    const data = JSON.parse(text);
+    if (data.response) {
+      // Escape HTML special characters for safe display
+      const code = data.response
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return `<pre><code class="language-java">${code}</code></pre>`;
+    }
+  } catch (e) {
+    // Not JSON, continue formatting as normal
+  }
+
   // Remove redundant "AI says:"
   text = text.replace(/^AI says:\s*/i, "");
 
@@ -50,6 +65,11 @@ function addMessage(sender, text) {
   msg.innerHTML = (sender === "server" ? "AI: " : "You: ") + formatText(text);
   messagesDiv.appendChild(msg);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  // Re-run Prism syntax highlighting if code exists
+  if (sender === "server") {
+    Prism.highlightAll();
+  }
 }
 
 function addSystemMessage(text) {

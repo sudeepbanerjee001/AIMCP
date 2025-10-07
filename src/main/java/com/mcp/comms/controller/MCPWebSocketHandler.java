@@ -1,140 +1,97 @@
 package com.mcp.comms.controller;
 
 import com.mcp.comms.memory.MemoryManager;
-import com.mcp.comms.service.IntentDetectionService;
 import com.mcp.comms.service.ToolInvokerService;
 import com.mcp.comms.service.ToolRegistryService;
+import com.mcp.comms.service.IntentDetectionService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.List;
 
-@Component
+@Controller
 public class MCPWebSocketHandler extends TextWebSocketHandler {
 
-    private final MemoryManager memoryManager;
-    private final IntentDetectionService intentDetectionService;
-    private final ToolRegistryService toolRegistryService;
-    private final ToolInvokerService toolInvokerService;
+    @Autowired
+    private MemoryManager memoryManager;
 
     @Autowired
-    public MCPWebSocketHandler(MemoryManager memoryManager,
-                               IntentDetectionService intentDetectionService,
-                               ToolRegistryService toolRegistryService,
-                               ToolInvokerService toolInvokerService) {
-        this.memoryManager = memoryManager;
-        this.intentDetectionService = intentDetectionService;
-        this.toolRegistryService = toolRegistryService;
-        this.toolInvokerService = toolInvokerService;
-    }
+    private ToolRegistryService toolRegistryService;
 
-    @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
-        System.out.println("[MCP FLOW] ✅ WebSocket connection established. Session ID: " + session.getId());
-    }
+    @Autowired
+    private ToolInvokerService toolInvokerService;
+
+    @Autowired
+    private IntentDetectionService intentDetectionService;
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String userMessage = message.getPayload();
-        System.out.println("\n[MCP FLOW] ? Received from client: " + userMessage);
+        System.out.println("[MCP FLOW] 📨 Received from client: " + userMessage);
 
-        // 1️⃣ Store user message
-        memoryManager.storeUserMessage(userMessage);
-        System.out.println("[MCP FLOW] ? Stored user message into MemoryManager");
+        // Store user message in memory
+        memoryManager.storeAiMessage(userMessage);
+        System.out.println("[MCP FLOW] 💾 Stored user message into MemoryManager");
 
-        // 2️⃣ Detect intent
-        String detectedIntent = intentDetectionService.detectIntent(userMessage);
-        System.out.println("[MCP FLOW] ? Intent detected: " + detectedIntent);
+        // Detect intent(s)
+        List<String> detectedIntents = intentDetectionService.detectIntents(userMessage);
+        String detectedIntent = detectedIntents.isEmpty() ? "unknown" : detectedIntents.get(0);
+        System.out.println("[MCP FLOW LOG] 🎯 Intent detected: " + detectedIntent);
 
-        // 3️⃣ Identify the tool for the intent
-        Map<String, Object> toolInfo = toolRegistryService.findToolByIntent(detectedIntent);
+        // Extract city dynamically (basic regex, can improve with NLP)
+        String city = extractCity(userMessage);
+        if (city != null) System.out.println("[MCP FLOW] 🌆 Extracted city: " + city);
+
+        // Find tool for intent
+        Map<String, Object> toolInfo = toolRegistryService.getToolForIntent(detectedIntent);
         if (toolInfo == null) {
-            session.sendMessage(new TextMessage("Sorry, I couldn't find a suitable tool for that request."));
+            session.sendMessage(new TextMessage("No tool available for intent: " + detectedIntent));
             return;
         }
+        System.out.println("[MCP FLOW] 🧩 Selected tool -> name: " + toolInfo.get("toolName"));
 
-        System.out.println("[MCP FLOW] ? Selected tool -> name: " + toolInfo.get("toolName"));
-
-        // 4️⃣ Extract city dynamically from user message
-        String city = extractCityFromMessage(userMessage);
-        System.out.println("[MCP FLOW] ?? Extracted city: " + city);
-
-        // 5️⃣ Prepare payload
+        // Prepare payload for the tool
         Map<String, Object> payload = new HashMap<>();
         payload.put("userMessage", userMessage);
-        payload.put("city", city);
-        payload.put("action", detectedIntent);
         payload.put("sessionId", session.getId());
+        payload.put("intent", detectedIntent);
+        payload.put("action", detectedIntent); // <-- important for Weather Forecast Tool
+        if (city != null) payload.put("city", city);
         payload.put("timestamp", System.currentTimeMillis());
 
-        System.out.println("[MCP FLOW] ? Payload prepared for tool: " + payload);
-
-        // 6️⃣ Invoke tool
-        Map<String, Object> toolResponseMap = toolInvokerService.invokeTool(
+        // Invoke tool
+        System.out.println("[MCP FLOW] 🚀 Invoking tool '" + toolInfo.get("toolName") + "' at " + toolInfo.get("endpoint"));
+        String toolResponse = toolInvokerService.invokeTool(
                 (String) toolInfo.get("toolName"),
                 (String) toolInfo.get("endpoint"),
                 payload
         );
 
-        // 7️⃣ Convert numeric string values to proper types if Weather Forecast Tool
-        if ("Weather Forecast Tool".equals(toolInfo.get("toolName"))) {
-            toolResponseMap = parseNumericValues(toolResponseMap);
+        // Store tool response in memory
+        memoryManager.storeAiMessage(toolResponse);
+        System.out.println("[MCP FLOW] 💾 Stored tool response into MemoryManager");
+
+        // Send tool response back to client
+        session.sendMessage(new TextMessage(toolResponse));
+        System.out.println("[MCP FLOW] 📤 Sent tool response back to client (session=" + session.getId() + ")");
+    }
+
+    /**
+     * Basic city extraction from user message. You can replace with more robust NLP extraction.
+     */
+    private String extractCity(String message) {
+        Pattern pattern = Pattern.compile("in ([A-Za-z ]+)(\\?|$)", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(message);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
         }
-
-        // 8️⃣ Store AI response
-        memoryManager.storeAiMessage(toolResponseMap.toString());
-        System.out.println("[MCP FLOW] ? Stored tool response into MemoryManager");
-
-        // 9️⃣ Send back to client
-        session.sendMessage(new TextMessage(toolResponseMap.toString()));
-        System.out.println("[MCP FLOW] ? Sent tool response back to client (session=" + session.getId() + ")");
-    }
-
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) {
-        System.out.println("[MCP FLOW] 🔒 WebSocket connection closed. Session ID: " + session.getId());
-    }
-
-    @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {
-        System.err.println("[MCP FLOW] ❌ WebSocket transport error: " + exception.getMessage());
-    }
-
-    // Helper method to extract city from user message
-    private String extractCityFromMessage(String message) {
-        // Simple regex-based approach
-        // Looks for "at <City>" or "in <City>" patterns
-        String city = "Unknown";
-        String lowerMsg = message.toLowerCase();
-        if (lowerMsg.contains(" at ")) {
-            city = message.substring(lowerMsg.indexOf(" at ") + 4).split("[,?]")[0].trim();
-        } else if (lowerMsg.contains(" in ")) {
-            city = message.substring(lowerMsg.indexOf(" in ") + 4).split("[,?]")[0].trim();
-        }
-        return city;
-    }
-
-    // Helper method to parse numeric string values to Double
-    private Map<String, Object> parseNumericValues(Map<String, Object> response) {
-        Map<String, Object> parsed = new HashMap<>();
-        for (String key : response.keySet()) {
-            Object value = response.get(key);
-            if (value instanceof String) {
-                String strVal = (String) value;
-                try {
-                    Double num = Double.parseDouble(strVal);
-                    parsed.put(key, num);
-                } catch (NumberFormatException e) {
-                    parsed.put(key, strVal); // keep as string if not numeric
-                }
-            } else {
-                parsed.put(key, value);
-            }
-        }
-        return parsed;
+        return null;
     }
 }
